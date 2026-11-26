@@ -60,7 +60,7 @@ public struct ComputedEnergyEquivalent: Hashable, Identifiable, Sendable {
 public enum EnergyEquivalentsCatalog {
     /// Static read-only CDN endpoint hosted on the SugarWatt site (Cloudflare Pages).
     /// Returns a JSON array of `EnergyEquivalentRule` objects.
-    public static let remoteURL = URL(string: "https://sugarwatt.app/api/equivalents.json")!
+    public static let remoteURL = URL(string: "https://sugarwatt.levicraft.app/api/equivalents.json")!
     private static let cacheKey = "sugarwatt.equivalents.cache.v1"
 
     /// Curated, scientifically grounded offline fallback catalog.
