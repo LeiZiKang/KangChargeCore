@@ -1,5 +1,18 @@
 import Foundation
 
+/// Result of parsing a bare MCP URL or natural-language share text copied from the CANDYSIGN app.
+public struct MCPInputExtraction: Sendable, Equatable {
+    public let url: URL
+    public let suggestedNickname: String?
+    public let extractedFromText: Bool
+
+    public init(url: URL, suggestedNickname: String? = nil, extractedFromText: Bool = false) {
+        self.url = url
+        self.suggestedNickname = suggestedNickname
+        self.extractedFromText = extractedFromText
+    }
+}
+
 public enum AppConfig {
     /// App Group shared by the app and its widgets. Injected at build time via `KCAppGroup` in Info.plist.
     public static let appGroup: String? = {
@@ -40,11 +53,71 @@ public enum AppConfig {
         #endif
     }
 
-    public static func validatedServerURL(_ raw: String) -> URL? {
+    /// Extracts the MCP server URL from either a bare URL or a full share snippet copied from the CANDYSIGN app.
+    /// Automatically ignores documentation links such as `SKILL.md` and prioritizes `/sse` endpoints.
+    public static func extractMCPInput(from raw: String) -> MCPInputExtraction? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
-              scheme == "https" || scheme == "http", url.host != nil else { return nil }
-        return url
+        guard !trimmed.isEmpty else { return nil }
+
+        let pattern = #"https?://[^\s`"'<>()\[\]{}「」『』《》，。；、]+"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return nil
+        }
+
+        let nsRange = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+        let matches = regex.matches(in: trimmed, range: nsRange)
+
+        var candidates: [URL] = []
+        let trailingPunctuation = CharacterSet(charactersIn: ".,;:!?`'\")]}。，；：")
+        for match in matches {
+            guard let range = Range(match.range, in: trimmed) else { continue }
+            var token = String(trimmed[range])
+            while let last = token.unicodeScalars.last, trailingPunctuation.contains(last) {
+                token.unicodeScalars.removeLast()
+            }
+            guard let url = URL(string: token),
+                  let scheme = url.scheme?.lowercased(),
+                  scheme == "https" || scheme == "http",
+                  let host = url.host, !host.isEmpty else { continue }
+            if url.path.lowercased().hasSuffix(".md") { continue }
+            candidates.append(url)
+        }
+
+        guard !candidates.isEmpty else { return nil }
+
+        let chosen = candidates.first(where: {
+            ($0.host?.lowercased().contains("thecandysign.com") ?? false) && $0.path.lowercased().hasSuffix("/sse")
+        })
+            ?? candidates.first(where: { $0.path.lowercased().hasSuffix("/sse") })
+            ?? candidates.first!
+
+        var nickname: String?
+        let namePatterns = [
+            #"名字是[「『"“]([^」』"”]{1,40})[」』"”]"#,
+            #"name is ["“]([^"”]{1,40})["”]"#,
+        ]
+        for np in namePatterns {
+            if let nr = try? NSRegularExpression(pattern: np, options: [.caseInsensitive]),
+               let m = nr.firstMatch(in: trimmed, range: nsRange),
+               m.numberOfRanges > 1,
+               let r = Range(m.range(at: 1), in: trimmed) {
+                let value = String(trimmed[r]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !value.isEmpty {
+                    nickname = value
+                    break
+                }
+            }
+        }
+
+        return MCPInputExtraction(
+            url: chosen,
+            suggestedNickname: nickname,
+            extractedFromText: trimmed != chosen.absoluteString
+        )
+    }
+
+    public static func validatedServerURL(_ raw: String) -> URL? {
+        extractMCPInput(from: raw)?.url
     }
 
     public static var deviceName: String {

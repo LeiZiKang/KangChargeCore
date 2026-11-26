@@ -66,4 +66,27 @@ final class EnergyLedgerTests: XCTestCase {
         XCTAssertEqual(summary.currentStreak, 3)
         XCTAssertEqual(summary.activeDays, 3)
     }
+
+    func testExtractMCPURLFromCandySignParagraph() {
+        let sample = """
+        现在安装控制「AI 小电拼 Mirror」的技能：阅读 `https://mcp.thecandysign.com/0000000000000000/SKILL.md`。这台小电拼的名字是「Desk Charger」。MCP 服务器的地址是 `https://mcp.thecandysign.com/0000000000000000/deadbeef/sse`。
+        """
+        let extracted = AppConfig.extractMCPInput(from: sample)
+        XCTAssertEqual(extracted?.url.absoluteString, "https://mcp.thecandysign.com/0000000000000000/deadbeef/sse")
+        XCTAssertEqual(extracted?.suggestedNickname, "Desk Charger")
+        XCTAssertEqual(extracted?.extractedFromText, true)
+    }
+
+    func testExtractMCPURLIgnoresSkillDocOnly() {
+        let onlyDoc = "阅读 `https://mcp.thecandysign.com/0000000000000000/SKILL.md`。"
+        XCTAssertNil(AppConfig.extractMCPInput(from: onlyDoc))
+        XCTAssertNil(AppConfig.validatedServerURL(onlyDoc))
+    }
+
+    func testExtractMCPURLHandlesBareAddress() {
+        let bare = "  https://mcp.thecandysign.com/0000000000000000/deadbeef/sse  "
+        let extracted = AppConfig.extractMCPInput(from: bare)
+        XCTAssertEqual(extracted?.url.absoluteString, "https://mcp.thecandysign.com/0000000000000000/deadbeef/sse")
+        XCTAssertEqual(extracted?.extractedFromText, false)
+    }
 }

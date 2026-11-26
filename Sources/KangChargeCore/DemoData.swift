@@ -101,7 +101,10 @@ public enum KCDemo {
                 cableBrandEn: "Apple",
                 cableNameZh: "240W 编织线",
                 cableNameEn: "240W Woven Cable",
-                hasBattery: false,
+                hasBattery: true,
+                batteryPresentCapacity: 78,
+                batteryDesignCapacity: 100,
+                batteryLastFullChargeCapacity: 100,
                 deviceNameZh: "MacBook Pro",
                 deviceNameEn: "MacBook Pro"
             ),
@@ -128,5 +131,29 @@ public enum KCDemo {
                 deviceNameEn: "iPhone 16 Pro"
             )
         ]
+    }
+
+    public static func energyAnalytics() -> EnergyAnalytics {
+        let portShares: [PortEnergyShare] = [
+            PortEnergyShare(portIndex: 2, name: "C1 · MacBook Pro", wattHours: 26_140, fraction: 0.58),
+            PortEnergyShare(portIndex: 3, name: "C2 · iPhone 16 Pro", wattHours: 10_810, fraction: 0.24),
+            PortEnergyShare(portIndex: 5, name: "C4 · Apple Watch", wattHours: 4_510, fraction: 0.10),
+            PortEnergyShare(portIndex: 1, name: "USB-A · AirPods", wattHours: 3_600, fraction: 0.08),
+        ]
+        // Realistic desk-worker charging rhythm peaking around 15:00 (3 PM)
+        let hourly: [Double] = [
+            8, 6, 4, 3, 3, 5,
+            12, 24, 48, 86, 118, 134,
+            122, 146, 178, 214, 192, 165,
+            132, 98, 76, 58, 36, 18
+        ]
+        // Mon...Sun in Wh/day average, peaking on Thursday
+        let weekday: [Double] = [195, 224, 210, 268, 242, 148, 132]
+        return EnergyAnalytics(
+            portShares: portShares,
+            hourlyWattHours: hourly,
+            weekdayWattHours: weekday,
+            totalWattHours: 45_060
+        )
     }
 }

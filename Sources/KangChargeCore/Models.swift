@@ -228,6 +228,15 @@ public struct PDStatus: Codable, Hashable, Identifiable, Sendable {
     public var sinkMaximumPdp: Double?
     public var sinkOperationalPdp: Double?
 
+    /// Device battery fraction (0...1) when reported over USB-PD Battery Status.
+    public var batteryFraction: Double? {
+        guard hasBattery == true,
+              let present = batteryPresentCapacity,
+              let full = batteryLastFullChargeCapacity ?? batteryDesignCapacity,
+              full > 0, present.isFinite, full.isFinite else { return nil }
+        return min(max(present / full, 0), 1)
+    }
+
     public init(
         port: Int,
         pdRevision: String? = nil,

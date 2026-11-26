@@ -59,6 +59,57 @@ public struct EnergySummary: Hashable, Sendable {
     }
 }
 
+public struct PortEnergyShare: Hashable, Identifiable, Sendable {
+    public let portIndex: Int
+    public let name: String
+    public let wattHours: Double
+    public let fraction: Double
+
+    public var id: Int { portIndex }
+
+    public init(portIndex: Int, name: String, wattHours: Double, fraction: Double) {
+        self.portIndex = portIndex
+        self.name = name
+        self.wattHours = wattHours
+        self.fraction = fraction
+    }
+}
+
+public struct EnergyAnalytics: Hashable, Sendable {
+    public let portShares: [PortEnergyShare]
+    /// 24 buckets indexed 0...23 (local hour of day), in Wh.
+    public let hourlyWattHours: [Double]
+    /// 7 buckets indexed 0...6 (Monday = 0 ... Sunday = 6), in Wh.
+    public let weekdayWattHours: [Double]
+    public let totalWattHours: Double
+
+    public var topPort: PortEnergyShare? { portShares.first }
+
+    public var peakHour: Int? {
+        guard let maxVal = hourlyWattHours.max(), maxVal > 0 else { return nil }
+        return hourlyWattHours.firstIndex(of: maxVal)
+    }
+
+    public var peakWeekday: Int? {
+        guard let maxVal = weekdayWattHours.max(), maxVal > 0 else { return nil }
+        return weekdayWattHours.firstIndex(of: maxVal)
+    }
+
+    public init(
+        portShares: [PortEnergyShare] = [],
+        hourlyWattHours: [Double] = Array(repeating: 0, count: 24),
+        weekdayWattHours: [Double] = Array(repeating: 0, count: 7),
+        totalWattHours: Double = 0
+    ) {
+        self.portShares = portShares
+        self.hourlyWattHours = hourlyWattHours.count == 24 ? hourlyWattHours : Array(repeating: 0, count: 24)
+        self.weekdayWattHours = weekdayWattHours.count == 7 ? weekdayWattHours : Array(repeating: 0, count: 7)
+        self.totalWattHours = totalWattHours
+    }
+
+    public static let empty = EnergyAnalytics()
+}
+
 /// Local + optional iCloud KVS daily energy accumulator.
 /// Tracks hardware-reported `session_charge_mwh` deltas per `(port, sessionId)` so
 /// both frequent macOS polling and periodic iOS widget refreshes build an accurate
@@ -76,6 +127,9 @@ public final class EnergyLedger: @unchecked Sendable {
     private struct StorePayload: Codable {
         var dailyMwh: [String: Double]
         var cursors: [Int: PortCursor]
+        var portMwh: [Int: Double]?
+        var hourMwh: [Int: Double]?
+        var weekdayMwh: [Int: Double]?
     }
 
     private let defaults: UserDefaults
@@ -166,6 +220,22 @@ public final class EnergyLedger: @unchecked Sendable {
 
             if delta > 0 {
                 payload.dailyMwh[dayKey, default: 0] += delta
+                var byPort = payload.portMwh ?? [:]
+                byPort[detail.port, default: 0] += delta
+                payload.portMwh = byPort
+
+                let hour = calendar.component(.hour, from: date)
+                var byHour = payload.hourMwh ?? [:]
+                byHour[hour, default: 0] += delta
+                payload.hourMwh = byHour
+
+                // Calendar.weekday: 1 = Sun, 2 = Mon ... 7 = Sat -> map to 0 = Mon ... 6 = Sun
+                let rawWeekday = calendar.component(.weekday, from: date)
+                let mondayBased = (rawWeekday + 5) % 7
+                var byWeekday = payload.weekdayMwh ?? [:]
+                byWeekday[mondayBased, default: 0] += delta
+                payload.weekdayMwh = byWeekday
+
                 addedMwh += delta
             }
             payload.cursors[detail.port] = PortCursor(
@@ -239,6 +309,42 @@ public final class EnergyLedger: @unchecked Sendable {
     public func summary(weeks: Int = 16, endingAt endDate: Date = Date()) -> EnergySummary {
         let map = dailyMap()
         return Self.buildSummary(from: map, weeks: weeks, endingAt: endDate, calendar: calendar)
+    }
+
+    /// Returns per-port, per-hour, and per-weekday breakdowns accumulated from hardware deltas.
+    public func analytics(portNames: [Int: String] = [:]) -> EnergyAnalytics {
+        lock.lock()
+        let portMap = payload.portMwh ?? [:]
+        let hourMap = payload.hourMwh ?? [:]
+        let weekdayMap = payload.weekdayMwh ?? [:]
+        let totalDailyWh = payload.dailyMwh.values.reduce(0, +) / 1000
+        lock.unlock()
+
+        let defaultNames: [Int: String] = [1: "USB-A", 2: "C1", 3: "C2", 4: "C3", 5: "C4"]
+        let totalPortWh = portMap.values.reduce(0, +) / 1000
+        let shares: [PortEnergyShare] = portMap
+            .filter { $0.value > 0 }
+            .sorted { $0.value > $1.value }
+            .map { (port, mwh) in
+                let wh = mwh / 1000
+                let label = portNames[port] ?? defaultNames[port] ?? "P\(port)"
+                return PortEnergyShare(
+                    portIndex: port,
+                    name: label,
+                    wattHours: wh,
+                    fraction: totalPortWh > 0 ? wh / totalPortWh : 0
+                )
+            }
+
+        let hourly = (0..<24).map { (hourMap[$0] ?? 0) / 1000 }
+        let weekday = (0..<7).map { (weekdayMap[$0] ?? 0) / 1000 }
+
+        return EnergyAnalytics(
+            portShares: shares,
+            hourlyWattHours: hourly,
+            weekdayWattHours: weekday,
+            totalWattHours: max(totalDailyWh, totalPortWh)
+        )
     }
 
     public func reset() {
