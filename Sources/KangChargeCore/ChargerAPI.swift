@@ -26,10 +26,6 @@ public enum AppConfig {
     /// Personal MCP SSE endpoint copied from the CANDYSIGN app. Stored locally only.
     public static var serverURL: URL? {
         #if os(macOS)
-        // Prefer Keychain when available, falling back to legacy UserDefaults for seamless upgrades.
-        if let secure = SecureStore.string(forKey: Key.serverURL).flatMap(validatedServerURL) {
-            return secure
-        }
         return defaults.string(forKey: Key.serverURL).flatMap(validatedServerURL)
         #else
         return SecureStore.string(forKey: Key.serverURL).flatMap(validatedServerURL)
@@ -38,9 +34,7 @@ public enum AppConfig {
 
     public static func setServerURL(_ url: URL?) {
         #if os(macOS)
-        // Store in App Group defaults for reliable unsigned/widget access and mirror in Keychain.
         defaults.set(url?.absoluteString, forKey: Key.serverURL)
-        SecureStore.set(url?.absoluteString, forKey: Key.serverURL)
         #else
         SecureStore.set(url?.absoluteString, forKey: Key.serverURL)
         #endif
