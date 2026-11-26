@@ -421,18 +421,23 @@ public struct PowerPressureMeter: View {
         return KCStyle.charging
     }
 
+    private var shouldAnimate: Bool {
+        animated && ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1"
+    }
+
     public var body: some View {
         let count = activeCount
+        let anim = shouldAnimate
         HStack(spacing: 2.5) {
             ForEach(0..<segments, id: \.self) { idx in
                 let isLit = idx < count
                 let isLeading = isLit && idx == count - 1
-                let isNextBuffer = animated && count > 0 && count < segments && idx == count
+                let isNextBuffer = anim && count > 0 && count < segments && idx == count
 
                 RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                     .fill(
                         isLit
-                            ? color(for: idx).opacity(isLeading && animated && pulse ? 0.62 : 1.0)
+                            ? color(for: idx).opacity(isLeading && anim && pulse ? 0.62 : 1.0)
                             : (isNextBuffer
                                 ? color(for: idx).opacity(pulse ? 0.28 : 0.08)
                                 : Color.primary.opacity(0.09))
@@ -442,13 +447,13 @@ public struct PowerPressureMeter: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.78), value: count)
         .onAppear {
-            guard animated, count > 0 else { return }
+            guard anim, count > 0 else { return }
             withAnimation(.easeInOut(duration: 1.05).repeatForever(autoreverses: true)) {
                 pulse = true
             }
         }
         .onChange(of: count > 0) { _, active in
-            if animated && active {
+            if anim && active {
                 withAnimation(.easeInOut(duration: 1.05).repeatForever(autoreverses: true)) {
                     pulse = true
                 }
