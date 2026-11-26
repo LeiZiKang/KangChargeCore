@@ -1,14 +1,31 @@
 import SwiftUI
 import KangChargeCore
 
-/// Restrained Apple-native minimalist design tokens shared across macOS, iOS, watchOS, and widgets.
+/// Restrained Apple-native + hardware-inspired design tokens shared across macOS, iOS, watchOS, and widgets.
+/// Palette distilled from the charger's industrial finish: warm ceramic off-white, anodized titanium gray,
+/// and surgical vermilion-orange accents.
 public enum KCStyle {
-    /// Warm restrained amber-orange used sparingly for hero power and active selection.
-    public static let accent = Color(red: 0.96, green: 0.44, blue: 0.14)
-    /// Apple-style vibrant green for "actively delivering power" and online indicators.
+    /// Signature vermilion-orange inspired by the charger's recessed port tongues (#E84C24).
+    public static let accent = Color(red: 0.91, green: 0.30, blue: 0.14)
+    /// Restrained Apple green for active power delivery and online indicators.
     public static let charging = Color(red: 0.19, green: 0.78, blue: 0.35)
-    public static let caution = Color(red: 1.0, green: 0.62, blue: 0.04)
-    public static let hot = Color(red: 0.96, green: 0.26, blue: 0.21)
+    /// Warm amber inspired by the hardware's dot-matrix display (#F2A31B).
+    public static let caution = Color(red: 0.95, green: 0.64, blue: 0.11)
+    public static let hot = Color(red: 0.92, green: 0.25, blue: 0.20)
+
+    /// Warm ceramic off-white light canvas (#FAF9F6) & deep graphite dark canvas (#18181A).
+    public static func canvasBackground(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.095, green: 0.095, blue: 0.102)
+            : Color(red: 0.980, green: 0.976, blue: 0.965)
+    }
+
+    /// Subtle warm ceramic surface for icons, tiles, and widgets (#F2F0EB light / #222225 dark).
+    public static func surfaceTile(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.145, green: 0.145, blue: 0.155)
+            : Color(red: 0.945, green: 0.937, blue: 0.918)
+    }
 
     public static func portTint(for port: PortSnapshot) -> Color {
         if !port.enabled { return .secondary.opacity(0.45) }
@@ -24,17 +41,17 @@ public enum KCStyle {
         }
     }
 
-    /// 5-step Apple-restrained heatmap intensity colors (level 0...4).
+    /// 5-step restrained heatmap intensity colors (level 0...4).
     public static func heatmapColor(level: Int, tint: Color = charging, colorScheme: ColorScheme) -> Color {
         switch level {
         case 0:
-            return colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
+            return colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.055)
         case 1:
-            return tint.opacity(colorScheme == .dark ? 0.30 : 0.25)
+            return tint.opacity(colorScheme == .dark ? 0.30 : 0.24)
         case 2:
-            return tint.opacity(colorScheme == .dark ? 0.52 : 0.48)
+            return tint.opacity(colorScheme == .dark ? 0.52 : 0.46)
         case 3:
-            return tint.opacity(colorScheme == .dark ? 0.76 : 0.72)
+            return tint.opacity(colorScheme == .dark ? 0.76 : 0.70)
         default:
             return tint
         }
