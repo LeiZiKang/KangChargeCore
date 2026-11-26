@@ -27,6 +27,13 @@ public enum KCStyle {
             : Color(red: 0.945, green: 0.937, blue: 0.918)
     }
 
+    /// Elevated card surface sitting cleanly on top of `canvasBackground` (#FFFFFF light / #1D1D20 dark).
+    public static func cardBackground(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.118, green: 0.118, blue: 0.128)
+            : Color.white
+    }
+
     public static func portTint(for port: PortSnapshot) -> Color {
         if !port.enabled { return .secondary.opacity(0.45) }
         return port.isCharging ? charging : .secondary
@@ -101,6 +108,39 @@ public enum KCFormat {
 
     public static func portBadgeName(_ port: PortSnapshot) -> String {
         port.connector == "A" ? "A" : port.name
+    }
+}
+
+/// Maps connected device names and port states to restrained Apple SF Symbols across macOS, iOS, watchOS, and widgets.
+public enum KCDeviceSymbol {
+    public static func systemName(for port: PortSnapshot) -> String {
+        if !port.isCharging { return "power" }
+        let name = (port.deviceName ?? "").lowercased()
+        if name.contains("macbook") || name.contains("laptop") || name.contains("thinkpad") {
+            return "laptopcomputer"
+        }
+        if name.contains("iphone") || name.contains("phone") || name.contains("pixel") || name.contains("galaxy") {
+            return "iphone"
+        }
+        if name.contains("ipad") || name.contains("tablet") {
+            return "ipad"
+        }
+        if name.contains("watch") {
+            return "applewatch"
+        }
+        if name.contains("airpods") || name.contains("buds") {
+            return "airpodspro"
+        }
+        if name.contains("headphone") || name.contains("max") {
+            return "headphones"
+        }
+        if name.contains("switch") || name.contains("steam") || name.contains("deck") {
+            return "gamecontroller"
+        }
+        if name.contains("camera") {
+            return "camera"
+        }
+        return "bolt.fill"
     }
 }
 
