@@ -2,12 +2,13 @@ import SwiftUI
 import KangChargeCore
 
 /// GitHub-contribution-style daily energy heatmap view.
-/// Renders cleanly in both interactive app screens (macOS / iOS) and static WidgetKit timelines.
+/// Keeps cells crisp and restrained (capped by `maxCellSize`) across macOS windows, iOS lists, and WidgetKit.
 public struct EnergyHeatmapView: View {
     public let summary: EnergySummary
     public var tint: Color
     public var cellSpacing: CGFloat
     public var cornerRadius: CGFloat
+    public var maxCellSize: CGFloat
     public var interactive: Bool
     public var showLegend: Bool
     public var showHeader: Bool
@@ -20,6 +21,7 @@ public struct EnergyHeatmapView: View {
         tint: Color = KCStyle.charging,
         cellSpacing: CGFloat = 3.5,
         cornerRadius: CGFloat = 3,
+        maxCellSize: CGFloat = 13,
         interactive: Bool = true,
         showLegend: Bool = true,
         showHeader: Bool = true
@@ -28,6 +30,7 @@ public struct EnergyHeatmapView: View {
         self.tint = tint
         self.cellSpacing = cellSpacing
         self.cornerRadius = cornerRadius
+        self.maxCellSize = maxCellSize
         self.interactive = interactive
         self.showLegend = showLegend
         self.showHeader = showHeader
@@ -98,25 +101,35 @@ public struct EnergyHeatmapView: View {
     }
 
     private var grid: some View {
-        HStack(alignment: .top, spacing: cellSpacing) {
-            ForEach(Array(columns.enumerated()), id: \.offset) { _, week in
-                VStack(spacing: cellSpacing) {
-                    ForEach(week) { day in
-                        cellView(for: day)
+        let cols = columns
+        let colCount = max(cols.count, 1)
+        return GeometryReader { geo in
+            let totalHSpacing = cellSpacing * CGFloat(max(colCount - 1, 0))
+            let fitWidth = (geo.size.width - totalHSpacing) / CGFloat(colCount)
+            let cellSize = max(5, min(maxCellSize, floor(fitWidth * 2) / 2))
+
+            HStack(alignment: .top, spacing: cellSpacing) {
+                ForEach(Array(cols.enumerated()), id: \.offset) { _, week in
+                    VStack(spacing: cellSpacing) {
+                        ForEach(week) { day in
+                            cellView(for: day, size: cellSize)
+                        }
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(height: 7 * maxCellSize + 6 * cellSpacing)
     }
 
     @ViewBuilder
-    private func cellView(for day: EnergyDay) -> some View {
+    private func cellView(for day: EnergyDay, size: CGFloat) -> some View {
         let level = day.level(maxWattHours: scaleMaxWh)
         let isSelected = selectedDay?.id == day.id
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let base = shape
             .fill(KCStyle.heatmapColor(level: level, tint: tint, colorScheme: colorScheme))
-            .aspectRatio(1, contentMode: .fit)
+            .frame(width: size, height: size)
             .overlay {
                 if isSelected {
                     shape.strokeBorder(Color.primary.opacity(0.65), lineWidth: 1)
